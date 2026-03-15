@@ -72,10 +72,15 @@ type TeamMembersResponse struct {
 }
 
 // ListTeamMembers retrieves all members of a team
+// Note: Requires ZohoSprints.users.READ OAuth scope
 func (c *Client) ListTeamMembers(teamID string) ([]TeamMember, error) {
 	var resp TeamMembersResponse
 	path := c.GetTeamPath(teamID) + "/users/"
-	err := c.GetJSON(path, nil, &resp)
+	params := url.Values{}
+	params.Set("action", "data")
+	params.Set("index", "1")
+	params.Set("range", "100")
+	err := c.GetJSON(path, params, &resp)
 	if err != nil {
 		return nil, err
 	}
