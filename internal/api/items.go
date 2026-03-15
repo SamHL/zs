@@ -35,6 +35,14 @@ type ItemResponse struct {
 	Item   Item   `json:"itemJObj"`
 }
 
+// ItemCreateResponse represents the API response for creating an item
+type ItemCreateResponse struct {
+	Status      string `json:"status"`
+	AddedItemID string `json:"addedItemId"`
+	ItemNo      string `json:"itemNo"`
+	StatusID    string `json:"statusId"`
+}
+
 // parseItemsResponse parses the raw items response into Item objects
 func parseItemsResponse(data []byte) ([]Item, error) {
 	var rawResp ItemsRawResponse
@@ -144,7 +152,7 @@ func (c *Client) GetItem(teamID, projectID, sprintID, itemID string) (*Item, err
 
 // CreateItem creates a new item in a sprint or backlog
 func (c *Client) CreateItem(teamID, projectID, sprintID string, itemData map[string]string) (*Item, error) {
-	var resp ItemResponse
+	var resp ItemCreateResponse
 	path := c.GetProjectPath(teamID, projectID) + "/sprints/" + sprintID + "/item/"
 
 	data := url.Values{}
@@ -156,7 +164,14 @@ func (c *Client) CreateItem(teamID, projectID, sprintID string, itemData map[str
 	if err != nil {
 		return nil, err
 	}
-	return &resp.Item, nil
+
+	// Return a minimal Item with the fields from the create response
+	return &Item{
+		ID:       resp.AddedItemID,
+		ItemNo:   resp.ItemNo,
+		Name:     itemData["name"],
+		StatusID: resp.StatusID,
+	}, nil
 }
 
 // CreateStory creates a new user story

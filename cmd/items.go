@@ -116,6 +116,20 @@ var itemsSearchCmd = &cobra.Command{
 	RunE: runItemsSearch,
 }
 
+var itemsTypesCmd = &cobra.Command{
+	Use:   "types",
+	Short: "List available item types",
+	Long:  `List all available item types (Story, Bug, Task, etc.) for the current project.`,
+	RunE:  runItemsTypes,
+}
+
+var itemsPrioritiesCmd = &cobra.Command{
+	Use:   "priorities",
+	Short: "List available priorities",
+	Long:  `List all available priority levels for the current project.`,
+	RunE:  runItemsPriorities,
+}
+
 func init() {
 	rootCmd.AddCommand(itemsCmd)
 	itemsCmd.AddCommand(itemsListCmd)
@@ -126,6 +140,8 @@ func init() {
 	itemsCmd.AddCommand(itemsAssignCmd)
 	itemsCmd.AddCommand(itemsDeleteCmd)
 	itemsCmd.AddCommand(itemsSearchCmd)
+	itemsCmd.AddCommand(itemsTypesCmd)
+	itemsCmd.AddCommand(itemsPrioritiesCmd)
 
 	// List flags
 	itemsListCmd.Flags().StringP("sprint", "s", "", "sprint ID (required)")
@@ -138,19 +154,19 @@ func init() {
 	itemsGetCmd.Flags().StringP("sprint", "s", "", "sprint ID (required)")
 	itemsGetCmd.MarkFlagRequired("sprint")
 
-	// Create flags
+	// Create flags - support both friendly names and raw IDs
 	itemsCreateCmd.Flags().StringP("name", "n", "", "item name (required)")
 	itemsCreateCmd.Flags().StringP("sprint", "s", "", "sprint ID (required)")
 	itemsCreateCmd.Flags().String("description", "", "item description")
 	itemsCreateCmd.Flags().IntP("points", "P", 0, "story points")
-	itemsCreateCmd.Flags().String("item-type-id", "", "item type ID (required)")
-	itemsCreateCmd.Flags().String("priority-id", "", "priority ID (required)")
+	itemsCreateCmd.Flags().String("type", "", "item type name (e.g., Story, Bug, Task)")
+	itemsCreateCmd.Flags().String("priority", "", "priority name (e.g., High, Medium, Low)")
+	itemsCreateCmd.Flags().String("item-type-id", "", "item type ID (alternative to --type)")
+	itemsCreateCmd.Flags().String("priority-id", "", "priority ID (alternative to --priority)")
 	itemsCreateCmd.Flags().String("epic", "", "epic ID to link item to")
 	itemsCreateCmd.Flags().String("assignee", "", "assignee user ID")
 	itemsCreateCmd.MarkFlagRequired("name")
 	itemsCreateCmd.MarkFlagRequired("sprint")
-	itemsCreateCmd.MarkFlagRequired("item-type-id")
-	itemsCreateCmd.MarkFlagRequired("priority-id")
 
 	// Update flags
 	itemsUpdateCmd.Flags().StringP("sprint", "s", "", "sprint ID (required)")
@@ -290,10 +306,41 @@ func runItemsCreate(cmd *cobra.Command, args []string) error {
 	sprintID, _ := cmd.Flags().GetString("sprint")
 	description, _ := cmd.Flags().GetString("description")
 	points, _ := cmd.Flags().GetInt("points")
-	itemTypeID, _ := cmd.Flags().GetString("item-type-id")
-	priorityID, _ := cmd.Flags().GetString("priority-id")
 	epicID, _ := cmd.Flags().GetString("epic")
 	assignee, _ := cmd.Flags().GetString("assignee")
+
+	// Get type - either by name or raw ID
+	typeName, _ := cmd.Flags().GetString("type")
+	itemTypeID, _ := cmd.Flags().GetString("item-type-id")
+
+	// Get priority - either by name or raw ID
+	priorityName, _ := cmd.Flags().GetString("priority")
+	priorityID, _ := cmd.Flags().GetString("priority-id")
+
+	client := api.NewClient()
+	client.SetDebug(IsDebug())
+
+	// Resolve type name to ID if provided
+	if typeName != "" {
+		itemTypeID, err = client.ResolveItemType(teamID, projectID, typeName)
+		if err != nil {
+			return fmt.Errorf("failed to resolve item type: %w", err)
+		}
+	}
+	if itemTypeID == "" {
+		return fmt.Errorf("item type required: use --type (e.g., Story, Bug) or --item-type-id")
+	}
+
+	// Resolve priority name to ID if provided
+	if priorityName != "" {
+		priorityID, err = client.ResolvePriority(teamID, projectID, priorityName)
+		if err != nil {
+			return fmt.Errorf("failed to resolve priority: %w", err)
+		}
+	}
+	if priorityID == "" {
+		return fmt.Errorf("priority required: use --priority (e.g., High, Medium, Low) or --priority-id")
+	}
 
 	data := map[string]string{
 		"name":           name,
@@ -312,9 +359,6 @@ func runItemsCreate(cmd *cobra.Command, args []string) error {
 	if assignee != "" {
 		data["users"] = "[\"" + assignee + "\"]"
 	}
-
-	client := api.NewClient()
-	client.SetDebug(IsDebug())
 
 	item, err := client.CreateItem(teamID, projectID, sprintID, data)
 	if err != nil {
@@ -505,4 +549,78 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return s[:max-3] + "..."
+}
+
+func runItemsTypes(cmd *cobra.Command, args []string) error {
+	teamID, err := RequireTeamID()
+	if err != nil {
+		return err
+	}
+	projectID, err := RequireProjectID()
+	if err != nil {
+		return err
+	}
+
+	client := api.NewClient()
+	client.SetDebug(IsDebug())
+
+	itemTypes, err := client.ListItemTypes(teamID, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to list item types: %w", err)
+	}
+
+	if len(itemTypes) == 0 {
+		output.PrintInfo("No item types found")
+		return nil
+	}
+
+	formatter := output.NewFormatter().WithFormat(GetOutputFormat())
+
+	switch GetOutputFormat() {
+	case "json", "yaml":
+		return formatter.Print(itemTypes)
+	default:
+		table := output.NewTableData("ID", "NAME")
+		for _, t := range itemTypes {
+			table.AddRow(t.ID, t.Name)
+		}
+		return formatter.Print(table)
+	}
+}
+
+func runItemsPriorities(cmd *cobra.Command, args []string) error {
+	teamID, err := RequireTeamID()
+	if err != nil {
+		return err
+	}
+	projectID, err := RequireProjectID()
+	if err != nil {
+		return err
+	}
+
+	client := api.NewClient()
+	client.SetDebug(IsDebug())
+
+	priorities, err := client.ListPriorities(teamID, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to list priorities: %w", err)
+	}
+
+	if len(priorities) == 0 {
+		output.PrintInfo("No priorities found")
+		return nil
+	}
+
+	formatter := output.NewFormatter().WithFormat(GetOutputFormat())
+
+	switch GetOutputFormat() {
+	case "json", "yaml":
+		return formatter.Print(priorities)
+	default:
+		table := output.NewTableData("ID", "NAME")
+		for _, p := range priorities {
+			table.AddRow(p.ID, p.Name)
+		}
+		return formatter.Print(table)
+	}
 }
