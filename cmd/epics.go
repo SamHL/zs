@@ -102,13 +102,13 @@ func init() {
 
 	// Create flags
 	epicsCreateCmd.Flags().StringP("name", "n", "", "epic name (required)")
-	epicsCreateCmd.Flags().StringP("description", "d", "", "epic description")
+	epicsCreateCmd.Flags().String("description", "", "epic description")
 	epicsCreateCmd.Flags().StringP("color", "c", "", "epic color (hex code)")
 	epicsCreateCmd.MarkFlagRequired("name")
 
 	// Update flags
 	epicsUpdateCmd.Flags().StringP("name", "n", "", "new epic name")
-	epicsUpdateCmd.Flags().StringP("description", "d", "", "new description")
+	epicsUpdateCmd.Flags().String("description", "", "new description")
 	epicsUpdateCmd.Flags().StringP("color", "c", "", "new color")
 	epicsUpdateCmd.Flags().String("status", "", "new status")
 

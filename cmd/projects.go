@@ -91,13 +91,13 @@ func init() {
 
 	// Create flags
 	projectsCreateCmd.Flags().StringP("name", "n", "", "project name (required)")
-	projectsCreateCmd.Flags().StringP("description", "d", "", "project description")
+	projectsCreateCmd.Flags().String("description", "", "project description")
 	projectsCreateCmd.Flags().String("prefix", "", "project prefix for item IDs")
 	projectsCreateCmd.MarkFlagRequired("name")
 
 	// Update flags
 	projectsUpdateCmd.Flags().StringP("name", "n", "", "new project name")
-	projectsUpdateCmd.Flags().StringP("description", "d", "", "new project description")
+	projectsUpdateCmd.Flags().String("description", "", "new project description")
 
 	// Delete flags
 	projectsDeleteCmd.Flags().BoolP("force", "f", false, "skip confirmation prompt")

@@ -141,7 +141,7 @@ func init() {
 	// Create flags
 	itemsCreateCmd.Flags().StringP("name", "n", "", "item name (required)")
 	itemsCreateCmd.Flags().StringP("sprint", "s", "", "sprint ID (required)")
-	itemsCreateCmd.Flags().StringP("description", "d", "", "item description")
+	itemsCreateCmd.Flags().String("description", "", "item description")
 	itemsCreateCmd.Flags().IntP("points", "P", 0, "story points")
 	itemsCreateCmd.Flags().String("item-type-id", "", "item type ID (required)")
 	itemsCreateCmd.Flags().String("priority-id", "", "priority ID (required)")
@@ -155,7 +155,7 @@ func init() {
 	// Update flags
 	itemsUpdateCmd.Flags().StringP("sprint", "s", "", "sprint ID (required)")
 	itemsUpdateCmd.Flags().StringP("name", "n", "", "new item name")
-	itemsUpdateCmd.Flags().StringP("description", "d", "", "new description")
+	itemsUpdateCmd.Flags().String("description", "", "new description")
 	itemsUpdateCmd.Flags().IntP("points", "P", 0, "new story points")
 	itemsUpdateCmd.Flags().String("status-id", "", "new status ID")
 	itemsUpdateCmd.MarkFlagRequired("sprint")
