@@ -91,14 +91,14 @@ func init() {
 	sprintsCmd.AddCommand(sprintsDeleteCmd)
 	sprintsCmd.AddCommand(sprintsActiveCmd)
 
-	// List flags
-	sprintsListCmd.Flags().StringP("status", "s", "", "filter by status: not_started, active, completed")
+	// List flags (status: 1=upcoming, 2=active, 3=completed, 4=canceled)
+	sprintsListCmd.Flags().StringP("status", "s", "", "filter by status type: 1=upcoming, 2=active, 3=completed, 4=canceled")
 
 	// Create flags
 	sprintsCreateCmd.Flags().StringP("name", "n", "", "sprint name (required)")
-	sprintsCreateCmd.Flags().String("start", "", "start date (YYYY-MM-DD) (required)")
-	sprintsCreateCmd.Flags().String("end", "", "end date (YYYY-MM-DD) (required)")
-	sprintsCreateCmd.Flags().StringP("goal", "g", "", "sprint goal")
+	sprintsCreateCmd.Flags().String("start", "", "start date ISO format (YYYY-MM-DDTHH:MM:SS+TZ) (required)")
+	sprintsCreateCmd.Flags().String("end", "", "end date ISO format (YYYY-MM-DDTHH:MM:SS+TZ) (required)")
+	sprintsCreateCmd.Flags().String("description", "", "sprint description")
 	sprintsCreateCmd.MarkFlagRequired("name")
 	sprintsCreateCmd.MarkFlagRequired("start")
 	sprintsCreateCmd.MarkFlagRequired("end")
@@ -144,16 +144,16 @@ func runSprintsList(cmd *cobra.Command, args []string) error {
 	case "json", "yaml":
 		return formatter.Print(sprints)
 	default:
-		table := output.NewTableData("ID", "NAME", "STATUS", "START", "END", "ITEMS", "POINTS")
+		table := output.NewTableData("ID", "NO", "NAME", "STATUS", "DURATION", "START", "END")
 		for _, s := range sprints {
 			table.AddRow(
 				s.ID,
+				s.SprintNo,
 				s.Name,
 				s.Status,
+				s.Duration,
 				s.StartDate,
 				s.EndDate,
-				fmt.Sprintf("%d/%d", s.CompletedCount, s.ItemCount),
-				fmt.Sprintf("%d/%d", s.CompletedPoints, s.TotalPoints),
 			)
 		}
 		return formatter.Print(table)
@@ -185,18 +185,11 @@ func runSprintsGet(cmd *cobra.Command, args []string) error {
 	case "json", "yaml":
 		return formatter.Print(sprint)
 	default:
-		fmt.Printf("Sprint: %s\n", sprint.Name)
+		fmt.Printf("Sprint: %s (#%s)\n", sprint.Name, sprint.SprintNo)
 		fmt.Printf("ID: %s\n", sprint.ID)
 		fmt.Printf("Status: %s\n", sprint.Status)
-		fmt.Printf("Duration: %s to %s\n", sprint.StartDate, sprint.EndDate)
-		if sprint.Goal != "" {
-			fmt.Printf("Goal: %s\n", sprint.Goal)
-		}
-		fmt.Printf("Items: %d completed, %d total\n", sprint.CompletedCount, sprint.ItemCount)
-		fmt.Printf("Points: %d completed, %d total\n", sprint.CompletedPoints, sprint.TotalPoints)
-		if sprint.Velocity > 0 {
-			fmt.Printf("Velocity: %d\n", sprint.Velocity)
-		}
+		fmt.Printf("Duration: %s (%s to %s)\n", sprint.Duration, sprint.StartDate, sprint.EndDate)
+		fmt.Printf("Created: %s by %s\n", sprint.CreatedTime, sprint.CreatedBy)
 		return nil
 	}
 }
@@ -214,12 +207,12 @@ func runSprintsCreate(cmd *cobra.Command, args []string) error {
 	name, _ := cmd.Flags().GetString("name")
 	startDate, _ := cmd.Flags().GetString("start")
 	endDate, _ := cmd.Flags().GetString("end")
-	goal, _ := cmd.Flags().GetString("goal")
+	description, _ := cmd.Flags().GetString("description")
 
 	client := api.NewClient()
 	client.SetDebug(IsDebug())
 
-	sprint, err := client.CreateSprint(teamID, projectID, name, startDate, endDate, goal)
+	sprint, err := client.CreateSprint(teamID, projectID, name, description, startDate, endDate)
 	if err != nil {
 		return fmt.Errorf("failed to create sprint: %w", err)
 	}
@@ -345,15 +338,9 @@ func runSprintsActive(cmd *cobra.Command, args []string) error {
 	case "json", "yaml":
 		return formatter.Print(sprint)
 	default:
-		fmt.Printf("Active Sprint: %s\n", sprint.Name)
+		fmt.Printf("Active Sprint: %s (#%s)\n", sprint.Name, sprint.SprintNo)
 		fmt.Printf("ID: %s\n", sprint.ID)
-		fmt.Printf("Duration: %s to %s\n", sprint.StartDate, sprint.EndDate)
-		if sprint.Goal != "" {
-			fmt.Printf("Goal: %s\n", sprint.Goal)
-		}
-		fmt.Printf("Progress: %d/%d items, %d/%d points\n",
-			sprint.CompletedCount, sprint.ItemCount,
-			sprint.CompletedPoints, sprint.TotalPoints)
+		fmt.Printf("Duration: %s (%s to %s)\n", sprint.Duration, sprint.StartDate, sprint.EndDate)
 		return nil
 	}
 }

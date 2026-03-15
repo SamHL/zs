@@ -74,6 +74,12 @@ func init() {
 	backlogCmd.AddCommand(backlogMoveToSprintCmd)
 	backlogCmd.AddCommand(backlogStatsCmd)
 
+	// Add flags - need current sprint and backlog IDs
+	backlogAddCmd.Flags().String("from-sprint", "", "current sprint ID of the item (required)")
+	backlogAddCmd.Flags().String("backlog-id", "", "backlog ID (required)")
+	backlogAddCmd.MarkFlagRequired("from-sprint")
+	backlogAddCmd.MarkFlagRequired("backlog-id")
+
 	// Prioritize flags
 	backlogPrioritizeCmd.Flags().IntP("position", "P", 1, "position in backlog (1 = top)")
 	backlogPrioritizeCmd.MarkFlagRequired("position")
@@ -114,7 +120,7 @@ func runBacklogList(cmd *cobra.Command, args []string) error {
 	case "json", "yaml":
 		return formatter.Print(items)
 	default:
-		table := output.NewTableData("PRI", "ID", "NO", "TYPE", "NAME", "POINTS")
+		table := output.NewTableData("PRI", "ID", "NO", "NAME", "POINTS")
 		for i, item := range items {
 			points := ""
 			if item.Points > 0 {
@@ -124,8 +130,7 @@ func runBacklogList(cmd *cobra.Command, args []string) error {
 				fmt.Sprintf("%d", i+1),
 				item.ID,
 				item.ItemNo,
-				item.Type,
-				truncate(item.Name, 40),
+				truncate(item.Name, 45),
 				points,
 			)
 		}
@@ -143,11 +148,13 @@ func runBacklogAdd(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	fromSprintID, _ := cmd.Flags().GetString("from-sprint")
+	backlogID, _ := cmd.Flags().GetString("backlog-id")
 
 	client := api.NewClient()
 	client.SetDebug(IsDebug())
 
-	item, err := client.AddToBacklog(teamID, projectID, itemID)
+	item, err := client.AddToBacklog(teamID, projectID, fromSprintID, itemID, backlogID)
 	if err != nil {
 		return fmt.Errorf("failed to add to backlog: %w", err)
 	}

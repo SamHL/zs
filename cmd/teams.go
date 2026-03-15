@@ -115,12 +115,10 @@ func runTeamsGet(cmd *cobra.Command, args []string) error {
 	default:
 		fmt.Printf("Team: %s\n", team.Name)
 		fmt.Printf("ID: %s\n", team.ID)
-		if team.Description != "" {
-			fmt.Printf("Description: %s\n", team.Description)
+		if team.OrgName != "" {
+			fmt.Printf("Organization: %s\n", team.OrgName)
 		}
-		fmt.Printf("Owner: %s\n", team.OwnerName)
-		fmt.Printf("Members: %d\n", team.MemberCount)
-		fmt.Printf("Created: %s\n", team.CreatedTime)
+		fmt.Printf("Owner ID: %s\n", team.OwnerID)
 		return nil
 	}
 }

@@ -128,40 +128,58 @@ func init() {
 	itemsCmd.AddCommand(itemsSearchCmd)
 
 	// List flags
-	itemsListCmd.Flags().String("sprint", "", "filter by sprint ID")
-	itemsListCmd.Flags().Bool("backlog", false, "show only backlog items")
+	itemsListCmd.Flags().StringP("sprint", "s", "", "sprint ID (required)")
 	itemsListCmd.Flags().String("type", "", "filter by type: Story, Bug, Task")
 	itemsListCmd.Flags().String("status", "", "filter by status ID")
 	itemsListCmd.Flags().String("assignee", "", "filter by assignee ID")
+	itemsListCmd.MarkFlagRequired("sprint")
+
+	// Get flags
+	itemsGetCmd.Flags().StringP("sprint", "s", "", "sprint ID (required)")
+	itemsGetCmd.MarkFlagRequired("sprint")
 
 	// Create flags
 	itemsCreateCmd.Flags().StringP("name", "n", "", "item name (required)")
-	itemsCreateCmd.Flags().StringP("type", "T", "Story", "item type: Story, Bug, Task")
+	itemsCreateCmd.Flags().StringP("sprint", "s", "", "sprint ID (required)")
 	itemsCreateCmd.Flags().StringP("description", "d", "", "item description")
 	itemsCreateCmd.Flags().IntP("points", "P", 0, "story points")
-	itemsCreateCmd.Flags().String("priority", "", "priority: Low, Medium, High")
-	itemsCreateCmd.Flags().String("sprint", "", "sprint ID to add item to")
+	itemsCreateCmd.Flags().String("item-type-id", "", "item type ID (required)")
+	itemsCreateCmd.Flags().String("priority-id", "", "priority ID (required)")
 	itemsCreateCmd.Flags().String("epic", "", "epic ID to link item to")
 	itemsCreateCmd.Flags().String("assignee", "", "assignee user ID")
 	itemsCreateCmd.MarkFlagRequired("name")
+	itemsCreateCmd.MarkFlagRequired("sprint")
+	itemsCreateCmd.MarkFlagRequired("item-type-id")
+	itemsCreateCmd.MarkFlagRequired("priority-id")
 
 	// Update flags
+	itemsUpdateCmd.Flags().StringP("sprint", "s", "", "sprint ID (required)")
 	itemsUpdateCmd.Flags().StringP("name", "n", "", "new item name")
 	itemsUpdateCmd.Flags().StringP("description", "d", "", "new description")
 	itemsUpdateCmd.Flags().IntP("points", "P", 0, "new story points")
-	itemsUpdateCmd.Flags().String("priority", "", "new priority")
 	itemsUpdateCmd.Flags().String("status-id", "", "new status ID")
+	itemsUpdateCmd.MarkFlagRequired("sprint")
 
 	// Move flags
-	itemsMoveCmd.Flags().String("sprint", "", "sprint ID to move to")
-	itemsMoveCmd.Flags().Bool("backlog", false, "move to backlog")
+	itemsMoveCmd.Flags().String("from-sprint", "", "current sprint ID (required)")
+	itemsMoveCmd.Flags().String("to-sprint", "", "target sprint ID (required)")
+	itemsMoveCmd.MarkFlagRequired("from-sprint")
+	itemsMoveCmd.MarkFlagRequired("to-sprint")
 
 	// Assign flags
+	itemsAssignCmd.Flags().StringP("sprint", "s", "", "sprint ID (required)")
 	itemsAssignCmd.Flags().StringP("user", "u", "", "user ID to assign to (required)")
+	itemsAssignCmd.MarkFlagRequired("sprint")
 	itemsAssignCmd.MarkFlagRequired("user")
 
 	// Delete flags
+	itemsDeleteCmd.Flags().StringP("sprint", "s", "", "sprint ID (required)")
 	itemsDeleteCmd.Flags().BoolP("force", "f", false, "skip confirmation prompt")
+	itemsDeleteCmd.MarkFlagRequired("sprint")
+
+	// Search flags
+	itemsSearchCmd.Flags().StringP("sprint", "s", "", "sprint ID (required)")
+	itemsSearchCmd.MarkFlagRequired("sprint")
 }
 
 func runItemsList(cmd *cobra.Command, args []string) error {
@@ -173,18 +191,13 @@ func runItemsList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	sprintID, _ := cmd.Flags().GetString("sprint")
 
 	client := api.NewClient()
 	client.SetDebug(IsDebug())
 
 	params := url.Values{}
 
-	if sprintID, _ := cmd.Flags().GetString("sprint"); sprintID != "" {
-		params.Set("sprint_id", sprintID)
-	}
-	if backlog, _ := cmd.Flags().GetBool("backlog"); backlog {
-		params.Set("backlog", "true")
-	}
 	if itemType, _ := cmd.Flags().GetString("type"); itemType != "" {
 		params.Set("item_type", itemType)
 	}
@@ -195,7 +208,7 @@ func runItemsList(cmd *cobra.Command, args []string) error {
 		params.Set("assignee", assignee)
 	}
 
-	items, err := client.ListItems(teamID, projectID, params)
+	items, err := client.ListItems(teamID, projectID, sprintID, params)
 	if err != nil {
 		return fmt.Errorf("failed to list items: %w", err)
 	}
@@ -211,13 +224,13 @@ func runItemsList(cmd *cobra.Command, args []string) error {
 	case "json", "yaml":
 		return formatter.Print(items)
 	default:
-		table := output.NewTableData("ID", "NO", "TYPE", "NAME", "STATUS", "ASSIGNEE", "POINTS")
+		table := output.NewTableData("ID", "NO", "NAME", "DURATION", "POINTS", "CREATED BY")
 		for _, i := range items {
 			points := ""
 			if i.Points > 0 {
 				points = fmt.Sprintf("%d", i.Points)
 			}
-			table.AddRow(i.ID, i.ItemNo, i.Type, truncate(i.Name, 40), i.Status, i.AssigneeName, points)
+			table.AddRow(i.ID, i.ItemNo, truncate(i.Name, 50), i.Duration, points, i.CreatedBy)
 		}
 		return formatter.Print(table)
 	}
@@ -233,11 +246,12 @@ func runItemsGet(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	sprintID, _ := cmd.Flags().GetString("sprint")
 
 	client := api.NewClient()
 	client.SetDebug(IsDebug())
 
-	item, err := client.GetItem(teamID, projectID, itemID)
+	item, err := client.GetItem(teamID, projectID, sprintID, itemID)
 	if err != nil {
 		return fmt.Errorf("failed to get item: %w", err)
 	}
@@ -250,31 +264,14 @@ func runItemsGet(cmd *cobra.Command, args []string) error {
 	default:
 		fmt.Printf("Item: %s %s\n", item.ItemNo, item.Name)
 		fmt.Printf("ID: %s\n", item.ID)
-		fmt.Printf("Type: %s\n", item.Type)
-		fmt.Printf("Status: %s\n", item.Status)
-		if item.Description != "" {
-			fmt.Printf("Description: %s\n", item.Description)
-		}
-		if item.Priority != "" {
-			fmt.Printf("Priority: %s\n", item.Priority)
+		if item.Duration != "" {
+			fmt.Printf("Duration: %s\n", item.Duration)
 		}
 		if item.Points > 0 {
 			fmt.Printf("Points: %d\n", item.Points)
 		}
-		if item.AssigneeName != "" {
-			fmt.Printf("Assignee: %s\n", item.AssigneeName)
-		}
-		if item.SprintName != "" {
-			fmt.Printf("Sprint: %s\n", item.SprintName)
-		}
-		if item.EpicName != "" {
-			fmt.Printf("Epic: %s\n", item.EpicName)
-		}
-		fmt.Printf("Reporter: %s\n", item.ReporterName)
+		fmt.Printf("Created by: %s\n", item.CreatedBy)
 		fmt.Printf("Created: %s\n", item.CreatedTime)
-		if item.UpdatedTime != "" {
-			fmt.Printf("Updated: %s\n", item.UpdatedTime)
-		}
 		return nil
 	}
 }
@@ -290,46 +287,41 @@ func runItemsCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	name, _ := cmd.Flags().GetString("name")
-	itemType, _ := cmd.Flags().GetString("type")
+	sprintID, _ := cmd.Flags().GetString("sprint")
 	description, _ := cmd.Flags().GetString("description")
 	points, _ := cmd.Flags().GetInt("points")
-	priority, _ := cmd.Flags().GetString("priority")
-	sprintID, _ := cmd.Flags().GetString("sprint")
+	itemTypeID, _ := cmd.Flags().GetString("item-type-id")
+	priorityID, _ := cmd.Flags().GetString("priority-id")
 	epicID, _ := cmd.Flags().GetString("epic")
 	assignee, _ := cmd.Flags().GetString("assignee")
 
 	data := map[string]string{
-		"name":      name,
-		"item_type": itemType,
+		"name":           name,
+		"projitemtypeid": itemTypeID,
+		"projpriorityid": priorityID,
 	}
 	if description != "" {
 		data["description"] = description
 	}
 	if points > 0 {
-		data["story_points"] = strconv.Itoa(points)
-	}
-	if priority != "" {
-		data["priority"] = priority
-	}
-	if sprintID != "" {
-		data["sprint_id"] = sprintID
+		data["point"] = strconv.Itoa(points)
 	}
 	if epicID != "" {
-		data["epic_id"] = epicID
+		data["epicid"] = epicID
 	}
 	if assignee != "" {
-		data["assignee"] = assignee
+		data["users"] = "[\"" + assignee + "\"]"
 	}
 
 	client := api.NewClient()
 	client.SetDebug(IsDebug())
 
-	item, err := client.CreateItem(teamID, projectID, data)
+	item, err := client.CreateItem(teamID, projectID, sprintID, data)
 	if err != nil {
 		return fmt.Errorf("failed to create item: %w", err)
 	}
 
-	output.PrintSuccess("%s created: %s %s (%s)", item.Type, item.ItemNo, item.Name, item.ID)
+	output.PrintSuccess("Item created: %s %s (%s)", item.ItemNo, item.Name, item.ID)
 
 	formatter := output.NewFormatter().WithFormat(GetOutputFormat())
 	if GetOutputFormat() == "json" || GetOutputFormat() == "yaml" {
@@ -348,6 +340,7 @@ func runItemsUpdate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	sprintID, _ := cmd.Flags().GetString("sprint")
 
 	updates := make(map[string]string)
 
@@ -358,13 +351,10 @@ func runItemsUpdate(cmd *cobra.Command, args []string) error {
 		updates["description"] = desc
 	}
 	if points, _ := cmd.Flags().GetInt("points"); points > 0 {
-		updates["story_points"] = strconv.Itoa(points)
-	}
-	if priority, _ := cmd.Flags().GetString("priority"); priority != "" {
-		updates["priority"] = priority
+		updates["point"] = strconv.Itoa(points)
 	}
 	if statusID, _ := cmd.Flags().GetString("status-id"); statusID != "" {
-		updates["status_id"] = statusID
+		updates["statusid"] = statusID
 	}
 
 	if len(updates) == 0 {
@@ -374,7 +364,7 @@ func runItemsUpdate(cmd *cobra.Command, args []string) error {
 	client := api.NewClient()
 	client.SetDebug(IsDebug())
 
-	item, err := client.UpdateItem(teamID, projectID, itemID, updates)
+	item, err := client.UpdateItem(teamID, projectID, sprintID, itemID, updates)
 	if err != nil {
 		return fmt.Errorf("failed to update item: %w", err)
 	}
@@ -394,32 +384,18 @@ func runItemsMove(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	sprintID, _ := cmd.Flags().GetString("sprint")
-	backlog, _ := cmd.Flags().GetBool("backlog")
-
-	if sprintID == "" && !backlog {
-		return fmt.Errorf("specify --sprint or --backlog")
-	}
+	fromSprintID, _ := cmd.Flags().GetString("from-sprint")
+	toSprintID, _ := cmd.Flags().GetString("to-sprint")
 
 	client := api.NewClient()
 	client.SetDebug(IsDebug())
 
-	var item *api.Item
-	if backlog {
-		item, err = client.MoveItemToBacklog(teamID, projectID, itemID)
-	} else {
-		item, err = client.MoveItemToSprint(teamID, projectID, itemID, sprintID)
-	}
-
+	item, err := client.MoveItemToSprint(teamID, projectID, fromSprintID, itemID, toSprintID)
 	if err != nil {
 		return fmt.Errorf("failed to move item: %w", err)
 	}
 
-	if backlog {
-		output.PrintSuccess("Item moved to backlog: %s", item.ItemNo)
-	} else {
-		output.PrintSuccess("Item moved to sprint: %s", item.ItemNo)
-	}
+	output.PrintSuccess("Item moved to sprint: %s", item.ItemNo)
 	return nil
 }
 
@@ -433,18 +409,18 @@ func runItemsAssign(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
+	sprintID, _ := cmd.Flags().GetString("sprint")
 	userID, _ := cmd.Flags().GetString("user")
 
 	client := api.NewClient()
 	client.SetDebug(IsDebug())
 
-	item, err := client.AssignItem(teamID, projectID, itemID, userID)
+	item, err := client.AssignItem(teamID, projectID, sprintID, itemID, userID)
 	if err != nil {
 		return fmt.Errorf("failed to assign item: %w", err)
 	}
 
-	output.PrintSuccess("Item assigned: %s -> %s", item.ItemNo, item.AssigneeName)
+	output.PrintSuccess("Item assigned: %s", item.ItemNo)
 	return nil
 }
 
@@ -458,12 +434,14 @@ func runItemsDelete(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
+	sprintID, _ := cmd.Flags().GetString("sprint")
 	force, _ := cmd.Flags().GetBool("force")
 
+	client := api.NewClient()
+	client.SetDebug(IsDebug())
+
 	if !force {
-		client := api.NewClient()
-		item, err := client.GetItem(teamID, projectID, itemID)
+		item, err := client.GetItem(teamID, projectID, sprintID, itemID)
 		if err != nil {
 			return fmt.Errorf("failed to get item: %w", err)
 		}
@@ -474,10 +452,7 @@ func runItemsDelete(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	client := api.NewClient()
-	client.SetDebug(IsDebug())
-
-	if err := client.DeleteItem(teamID, projectID, itemID); err != nil {
+	if err := client.DeleteItem(teamID, projectID, sprintID, itemID); err != nil {
 		return fmt.Errorf("failed to delete item: %w", err)
 	}
 
@@ -495,11 +470,12 @@ func runItemsSearch(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	sprintID, _ := cmd.Flags().GetString("sprint")
 
 	client := api.NewClient()
 	client.SetDebug(IsDebug())
 
-	items, err := client.SearchItems(teamID, projectID, query)
+	items, err := client.SearchItems(teamID, projectID, sprintID, query)
 	if err != nil {
 		return fmt.Errorf("failed to search items: %w", err)
 	}
@@ -515,9 +491,9 @@ func runItemsSearch(cmd *cobra.Command, args []string) error {
 	case "json", "yaml":
 		return formatter.Print(items)
 	default:
-		table := output.NewTableData("ID", "NO", "TYPE", "NAME", "STATUS")
+		table := output.NewTableData("ID", "NO", "NAME")
 		for _, i := range items {
-			table.AddRow(i.ID, i.ItemNo, i.Type, truncate(i.Name, 50), i.Status)
+			table.AddRow(i.ID, i.ItemNo, truncate(i.Name, 60))
 		}
 		return formatter.Print(table)
 	}

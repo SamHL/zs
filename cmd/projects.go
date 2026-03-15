@@ -128,9 +128,9 @@ func runProjectsList(cmd *cobra.Command, args []string) error {
 	case "json", "yaml":
 		return formatter.Print(projects)
 	default:
-		table := output.NewTableData("ID", "NAME", "PREFIX", "STATUS", "SPRINTS", "ITEMS")
+		table := output.NewTableData("ID", "NAME", "OWNER", "GROUP")
 		for _, p := range projects {
-			table.AddRow(p.ID, p.Name, p.Prefix, p.Status, fmt.Sprintf("%d", p.SprintCount), fmt.Sprintf("%d", p.ItemCount))
+			table.AddRow(p.ID, p.Name, p.OwnerName, p.GroupName)
 		}
 		return formatter.Print(table)
 	}
@@ -159,16 +159,12 @@ func runProjectsGet(cmd *cobra.Command, args []string) error {
 	default:
 		fmt.Printf("Project: %s\n", project.Name)
 		fmt.Printf("ID: %s\n", project.ID)
-		fmt.Printf("Prefix: %s\n", project.Prefix)
-		if project.Description != "" {
-			fmt.Printf("Description: %s\n", project.Description)
+		if project.OwnerName != "" {
+			fmt.Printf("Owner: %s\n", project.OwnerName)
 		}
-		fmt.Printf("Status: %s\n", project.Status)
-		fmt.Printf("Owner: %s\n", project.OwnerName)
-		fmt.Printf("Sprints: %d\n", project.SprintCount)
-		fmt.Printf("Items: %d (completed: %d)\n", project.ItemCount, project.CompletedCount)
-		fmt.Printf("Backlog: %d\n", project.BacklogCount)
-		fmt.Printf("Created: %s\n", project.CreatedTime)
+		if project.GroupName != "" {
+			fmt.Printf("Group: %s\n", project.GroupName)
+		}
 		return nil
 	}
 }

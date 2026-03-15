@@ -15,7 +15,7 @@ import (
 
 const (
 	// OAuth scopes required for full Sprints access
-	DefaultScopes = "ZohoSprints.teams.READ,ZohoSprints.projects.ALL,ZohoSprints.sprints.ALL,ZohoSprints.items.ALL,ZohoSprints.epics.ALL"
+	DefaultScopes = "ZOHOSPRINTS.teams.ALL,ZOHOSPRINTS.projects.ALL,ZOHOSPRINTS.sprints.ALL,ZOHOSPRINTS.items.ALL"
 
 	// Local callback server settings
 	CallbackPort = 8484

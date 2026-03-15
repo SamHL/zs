@@ -27,9 +27,10 @@ func (c *Client) ListBacklog(teamID, projectID string) ([]BacklogItem, error) {
 	return resp.Items, nil
 }
 
-// AddToBacklog adds an item to the backlog
-func (c *Client) AddToBacklog(teamID, projectID, itemID string) (*Item, error) {
-	return c.MoveItemToBacklog(teamID, projectID, itemID)
+// AddToBacklog adds an item to the backlog by moving it from a sprint
+// Note: Requires the current sprint ID and backlog ID
+func (c *Client) AddToBacklog(teamID, projectID, currentSprintID, itemID, backlogID string) (*Item, error) {
+	return c.MoveItemToSprint(teamID, projectID, currentSprintID, itemID, backlogID)
 }
 
 // PrioritizeBacklogItem sets the priority/position of a backlog item

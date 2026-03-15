@@ -114,6 +114,18 @@ func init() {
 
 	// Delete flags
 	epicsDeleteCmd.Flags().BoolP("force", "f", false, "skip confirmation prompt")
+
+	// Link flags - need sprint ID for item operations
+	epicsLinkCmd.Flags().StringP("sprint", "s", "", "sprint ID of the item (required)")
+	epicsLinkCmd.MarkFlagRequired("sprint")
+
+	// Unlink flags
+	epicsUnlinkCmd.Flags().StringP("sprint", "s", "", "sprint ID of the item (required)")
+	epicsUnlinkCmd.MarkFlagRequired("sprint")
+
+	// Items flags
+	epicsItemsCmd.Flags().StringP("sprint", "s", "", "sprint ID to search in (required)")
+	epicsItemsCmd.MarkFlagRequired("sprint")
 }
 
 func runEpicsList(cmd *cobra.Command, args []string) error {
@@ -332,11 +344,12 @@ func runEpicsLink(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	sprintID, _ := cmd.Flags().GetString("sprint")
 
 	client := api.NewClient()
 	client.SetDebug(IsDebug())
 
-	item, err := client.LinkItemToEpic(teamID, projectID, itemID, epicID)
+	item, err := client.LinkItemToEpic(teamID, projectID, sprintID, itemID, epicID)
 	if err != nil {
 		return fmt.Errorf("failed to link item: %w", err)
 	}
@@ -355,11 +368,12 @@ func runEpicsUnlink(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	sprintID, _ := cmd.Flags().GetString("sprint")
 
 	client := api.NewClient()
 	client.SetDebug(IsDebug())
 
-	item, err := client.UnlinkItemFromEpic(teamID, projectID, itemID)
+	item, err := client.UnlinkItemFromEpic(teamID, projectID, sprintID, itemID)
 	if err != nil {
 		return fmt.Errorf("failed to unlink item: %w", err)
 	}
@@ -378,11 +392,12 @@ func runEpicsItems(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	sprintID, _ := cmd.Flags().GetString("sprint")
 
 	client := api.NewClient()
 	client.SetDebug(IsDebug())
 
-	items, err := client.ListEpicItems(teamID, projectID, epicID)
+	items, err := client.ListEpicItems(teamID, projectID, sprintID, epicID)
 	if err != nil {
 		return fmt.Errorf("failed to list epic items: %w", err)
 	}
@@ -398,9 +413,13 @@ func runEpicsItems(cmd *cobra.Command, args []string) error {
 	case "json", "yaml":
 		return formatter.Print(items)
 	default:
-		table := output.NewTableData("ID", "NO", "TYPE", "NAME", "STATUS", "SPRINT")
+		table := output.NewTableData("ID", "NO", "NAME", "POINTS")
 		for _, i := range items {
-			table.AddRow(i.ID, i.ItemNo, i.Type, truncate(i.Name, 35), i.Status, i.SprintName)
+			points := ""
+			if i.Points > 0 {
+				points = fmt.Sprintf("%d", i.Points)
+			}
+			table.AddRow(i.ID, i.ItemNo, truncate(i.Name, 45), points)
 		}
 		return formatter.Print(table)
 	}

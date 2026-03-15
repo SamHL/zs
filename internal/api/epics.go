@@ -103,22 +103,23 @@ func (c *Client) DeleteEpic(teamID, projectID, epicID string) error {
 }
 
 // ListEpicItems retrieves all items linked to an epic
-func (c *Client) ListEpicItems(teamID, projectID, epicID string) ([]Item, error) {
+// Note: Requires a sprint ID to search within
+func (c *Client) ListEpicItems(teamID, projectID, sprintID, epicID string) ([]Item, error) {
 	params := url.Values{}
 	params.Set("epic_id", epicID)
-	return c.ListItems(teamID, projectID, params)
+	return c.ListItems(teamID, projectID, sprintID, params)
 }
 
 // LinkItemToEpic links an item to an epic
-func (c *Client) LinkItemToEpic(teamID, projectID, itemID, epicID string) (*Item, error) {
-	return c.UpdateItem(teamID, projectID, itemID, map[string]string{
-		"epic_id": epicID,
+func (c *Client) LinkItemToEpic(teamID, projectID, sprintID, itemID, epicID string) (*Item, error) {
+	return c.UpdateItem(teamID, projectID, sprintID, itemID, map[string]string{
+		"epicid": epicID,
 	})
 }
 
 // UnlinkItemFromEpic removes an item's epic link
-func (c *Client) UnlinkItemFromEpic(teamID, projectID, itemID string) (*Item, error) {
-	return c.UpdateItem(teamID, projectID, itemID, map[string]string{
-		"epic_id": "",
+func (c *Client) UnlinkItemFromEpic(teamID, projectID, sprintID, itemID string) (*Item, error) {
+	return c.UpdateItem(teamID, projectID, sprintID, itemID, map[string]string{
+		"epicid": "",
 	})
 }

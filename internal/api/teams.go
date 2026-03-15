@@ -1,18 +1,19 @@
 package api
 
 import (
+	"fmt"
 	"net/url"
 )
 
 // Team represents a Zoho Sprints team
 type Team struct {
 	ID          string `json:"zsoid"`
-	Name        string `json:"team_name"`
-	Description string `json:"team_desc"`
-	OwnerID     string `json:"owner_zsoid"`
+	Name        string `json:"teamName"`
+	OrgName     string `json:"orgName"`
+	OwnerID     string `json:"portalOwner"`
 	OwnerName   string `json:"owner_name"`
-	CreatedTime string `json:"created_time"`
-	LogoURL     string `json:"logo_url"`
+	Type        int    `json:"type"`
+	IsShowTeam  bool   `json:"isShowTeam"`
 	MemberCount int    `json:"member_count"`
 }
 
@@ -41,13 +42,17 @@ func (c *Client) ListTeams() ([]Team, error) {
 
 // GetTeam retrieves a specific team by ID
 func (c *Client) GetTeam(teamID string) (*Team, error) {
-	var resp TeamResponse
-	path := c.GetTeamPath(teamID) + "/"
-	err := c.GetJSON(path, nil, &resp)
+	// List all teams and find the one with matching ID
+	teams, err := c.ListTeams()
 	if err != nil {
 		return nil, err
 	}
-	return &resp.Team, nil
+	for _, t := range teams {
+		if t.ID == teamID {
+			return &t, nil
+		}
+	}
+	return nil, fmt.Errorf("team not found: %s", teamID)
 }
 
 // TeamMember represents a team member
