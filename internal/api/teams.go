@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/url"
+	"strings"
 )
 
 // Team represents a Zoho Sprints team
@@ -72,7 +73,9 @@ type TeamMembersResponse struct {
 }
 
 // ListTeamMembers retrieves all members of a team
-// Note: Requires ZohoSprints.users.READ OAuth scope
+// Note: This endpoint requires additional OAuth scopes that may not be available
+// in the standard Zoho Sprints API. Consider using the userDisplayName map from
+// other API responses to get user information.
 func (c *Client) ListTeamMembers(teamID string) ([]TeamMember, error) {
 	var resp TeamMembersResponse
 	path := c.GetTeamPath(teamID) + "/users/"
@@ -82,6 +85,10 @@ func (c *Client) ListTeamMembers(teamID string) ([]TeamMember, error) {
 	params.Set("range", "100")
 	err := c.GetJSON(path, params, &resp)
 	if err != nil {
+		// Check for OAuth scope error and provide helpful message
+		if strings.Contains(err.Error(), "oauthscope") || strings.Contains(err.Error(), "7601") {
+			return nil, fmt.Errorf("users API requires additional OAuth scopes not available in standard access. User names are available in item/sprint listings via userDisplayName")
+		}
 		return nil, err
 	}
 	return resp.Members, nil
