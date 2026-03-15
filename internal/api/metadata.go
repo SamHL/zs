@@ -19,6 +19,15 @@ type Priority struct {
 	Name string `json:"proj_priority_name"`
 }
 
+// Status represents a workflow status in Zoho Sprints
+type Status struct {
+	ID         string `json:"status_id"`
+	Name       string `json:"status_name"`
+	Percentage int    `json:"percentage"`
+	IsStart    bool   `json:"is_start"`
+	IsEnd      bool   `json:"is_end"`
+}
+
 // ItemTypesRawResponse represents the raw API response for item types
 type ItemTypesRawResponse struct {
 	Status       string                   `json:"status"`
@@ -31,6 +40,13 @@ type PrioritiesRawResponse struct {
 	Status       string                   `json:"status"`
 	PriorityJObj map[string][]interface{} `json:"projPriorityJObj"`
 	PriorityIDs  []string                 `json:"projPriorityIds"`
+}
+
+// StatusesRawResponse represents the raw API response for statuses
+type StatusesRawResponse struct {
+	Status    string                   `json:"status"`
+	StatusJObj map[string][]interface{} `json:"statusJObj"`
+	StatusIDs  []string                 `json:"statusIds"`
 }
 
 // ListItemTypes retrieves all item types for a project
@@ -138,4 +154,67 @@ func (c *Client) ResolvePriority(teamID, projectID, name string) (string, error)
 		validPriorities = append(validPriorities, p.Name)
 	}
 	return "", fmt.Errorf("unknown priority '%s', valid priorities: %s", name, strings.Join(validPriorities, ", "))
+}
+
+// ListStatuses retrieves all workflow statuses for a project
+func (c *Client) ListStatuses(teamID, projectID string) ([]Status, error) {
+	path := c.GetProjectPath(teamID, projectID) + "/itemstatus/"
+	params := url.Values{}
+	params.Set("action", "data")
+	params.Set("index", "1")
+	params.Set("range", "100")
+
+	data, err := c.Get(path, params)
+	if err != nil {
+		return nil, err
+	}
+
+	var rawResp StatusesRawResponse
+	if err := json.Unmarshal(data, &rawResp); err != nil {
+		return nil, fmt.Errorf("failed to parse statuses response: %w", err)
+	}
+
+	// Array indices from status_prop:
+	// 0=statusName, 1=isDefault, 2=statusDescription, 3=statusPercentage, 4=statusType,
+	// 5=colorCode, 6=isStart, 7=isEnd, 8=createdBy, 9=createdTime
+	var statuses []Status
+	for _, id := range rawResp.StatusIDs {
+		if arr, ok := rawResp.StatusJObj[id]; ok && len(arr) >= 8 {
+			percentage := 0
+			if p, ok := arr[3].(float64); ok {
+				percentage = int(p)
+			}
+			statuses = append(statuses, Status{
+				ID:         id,
+				Name:       toString(arr[0]),
+				Percentage: percentage,
+				IsStart:    toBool(arr[6]),
+				IsEnd:      toBool(arr[7]),
+			})
+		}
+	}
+
+	return statuses, nil
+}
+
+// ResolveStatus finds a status ID by name (case-insensitive)
+func (c *Client) ResolveStatus(teamID, projectID, name string) (string, error) {
+	statuses, err := c.ListStatuses(teamID, projectID)
+	if err != nil {
+		return "", err
+	}
+
+	nameLower := strings.ToLower(name)
+	for _, s := range statuses {
+		if strings.ToLower(s.Name) == nameLower {
+			return s.ID, nil
+		}
+	}
+
+	// Build list of valid statuses for error message
+	var validStatuses []string
+	for _, s := range statuses {
+		validStatuses = append(validStatuses, s.Name)
+	}
+	return "", fmt.Errorf("unknown status '%s', valid statuses: %s", name, strings.Join(validStatuses, ", "))
 }

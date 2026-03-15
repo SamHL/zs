@@ -92,6 +92,23 @@ func toString(v interface{}) string {
 	}
 }
 
+// toBool converts an interface{} to bool
+func toBool(v interface{}) bool {
+	if v == nil {
+		return false
+	}
+	switch val := v.(type) {
+	case bool:
+		return val
+	case string:
+		return val == "true" || val == "1"
+	case float64:
+		return val != 0
+	default:
+		return false
+	}
+}
+
 // GetProject retrieves a specific project by ID
 func (c *Client) GetProject(teamID, projectID string) (*Project, error) {
 	// List all projects and find the one with matching ID

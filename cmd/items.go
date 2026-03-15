@@ -130,6 +130,13 @@ var itemsPrioritiesCmd = &cobra.Command{
 	RunE:  runItemsPriorities,
 }
 
+var itemsStatusesCmd = &cobra.Command{
+	Use:   "statuses",
+	Short: "List available statuses",
+	Long:  `List all available workflow statuses for the current project.`,
+	RunE:  runItemsStatuses,
+}
+
 func init() {
 	rootCmd.AddCommand(itemsCmd)
 	itemsCmd.AddCommand(itemsListCmd)
@@ -142,6 +149,7 @@ func init() {
 	itemsCmd.AddCommand(itemsSearchCmd)
 	itemsCmd.AddCommand(itemsTypesCmd)
 	itemsCmd.AddCommand(itemsPrioritiesCmd)
+	itemsCmd.AddCommand(itemsStatusesCmd)
 
 	// List flags
 	itemsListCmd.Flags().StringP("sprint", "s", "", "sprint ID (required)")
@@ -620,6 +628,44 @@ func runItemsPriorities(cmd *cobra.Command, args []string) error {
 		table := output.NewTableData("ID", "NAME")
 		for _, p := range priorities {
 			table.AddRow(p.ID, p.Name)
+		}
+		return formatter.Print(table)
+	}
+}
+
+func runItemsStatuses(cmd *cobra.Command, args []string) error {
+	teamID, err := RequireTeamID()
+	if err != nil {
+		return err
+	}
+	projectID, err := RequireProjectID()
+	if err != nil {
+		return err
+	}
+
+	client := api.NewClient()
+	client.SetDebug(IsDebug())
+
+	statuses, err := client.ListStatuses(teamID, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to list statuses: %w", err)
+	}
+
+	if len(statuses) == 0 {
+		output.PrintInfo("No statuses found")
+		return nil
+	}
+
+	formatter := output.NewFormatter().WithFormat(GetOutputFormat())
+
+	switch GetOutputFormat() {
+	case "json", "yaml":
+		return formatter.Print(statuses)
+	default:
+		table := output.NewTableData("ID", "NAME", "PROGRESS")
+		for _, s := range statuses {
+			progress := fmt.Sprintf("%d%%", s.Percentage)
+			table.AddRow(s.ID, s.Name, progress)
 		}
 		return formatter.Print(table)
 	}
