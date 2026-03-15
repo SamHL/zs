@@ -240,12 +240,11 @@ func runSprintsStart(cmd *cobra.Command, args []string) error {
 	client := api.NewClient()
 	client.SetDebug(IsDebug())
 
-	sprint, err := client.StartSprint(teamID, projectID, sprintID)
-	if err != nil {
+	if err := client.StartSprint(teamID, projectID, sprintID); err != nil {
 		return fmt.Errorf("failed to start sprint: %w", err)
 	}
 
-	output.PrintSuccess("Sprint started: %s", sprint.Name)
+	output.PrintSuccess("Sprint started: %s", sprintID)
 	return nil
 }
 
@@ -263,12 +262,11 @@ func runSprintsComplete(cmd *cobra.Command, args []string) error {
 	client := api.NewClient()
 	client.SetDebug(IsDebug())
 
-	sprint, err := client.CompleteSprint(teamID, projectID, sprintID)
-	if err != nil {
+	if err := client.CompleteSprint(teamID, projectID, sprintID); err != nil {
 		return fmt.Errorf("failed to complete sprint: %w", err)
 	}
 
-	output.PrintSuccess("Sprint completed: %s", sprint.Name)
+	output.PrintSuccess("Sprint completed: %s", sprintID)
 	return nil
 }
 

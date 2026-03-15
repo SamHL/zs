@@ -168,17 +168,23 @@ func (c *Client) UpdateSprint(teamID, projectID, sprintID string, updates map[st
 }
 
 // StartSprint starts a sprint (changes status to active)
-func (c *Client) StartSprint(teamID, projectID, sprintID string) (*Sprint, error) {
-	return c.UpdateSprint(teamID, projectID, sprintID, map[string]string{
-		"status": "active",
-	})
+func (c *Client) StartSprint(teamID, projectID, sprintID string) error {
+	path := c.GetProjectPath(teamID, projectID) + "/sprints/" + sprintID + "/"
+	data := url.Values{}
+	data.Set("action", "startsprint")
+
+	_, err := c.Post(path, data)
+	return err
 }
 
 // CompleteSprint completes a sprint
-func (c *Client) CompleteSprint(teamID, projectID, sprintID string) (*Sprint, error) {
-	return c.UpdateSprint(teamID, projectID, sprintID, map[string]string{
-		"status": "completed",
-	})
+func (c *Client) CompleteSprint(teamID, projectID, sprintID string) error {
+	path := c.GetProjectPath(teamID, projectID) + "/sprints/" + sprintID + "/"
+	data := url.Values{}
+	data.Set("action", "completesprint")
+
+	_, err := c.Post(path, data)
+	return err
 }
 
 // DeleteSprint deletes a sprint
